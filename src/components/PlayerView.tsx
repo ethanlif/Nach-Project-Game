@@ -26,6 +26,18 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
   const [selectedRole, setSelectedRole] = useState<PlayerRole>(PlayerRole.UNASSIGNED);
+  const [tapCount, setTapCount] = useState(0);
+  const [challengeProgress, setChallengeProgress] = useState(0);
+
+  // Challenge logic for Victory Phase
+  useEffect(() => {
+    if (room?.status === GamePhase.VICTORY && tapCount > 0) {
+      const timeout = setTimeout(() => {
+        gameService.updatePlayerScore(roomId!, userId, tapCount);
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [tapCount, room?.status, roomId, userId]);
 
   // Auto-join from URL if code present
   useEffect(() => {
@@ -207,6 +219,34 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
                     <h2 className="text-xl font-bold uppercase text-[var(--gold)] mb-2">{STORY_BEATS.REBELLION.title}</h2>
                     <p className="text-[var(--sand)]/80 text-sm mb-6">{STORY_BEATS.REBELLION.conflict}</p>
                     
+                    {/* Interactive Scan Challenge */}
+                    <div className="mb-6 p-4 border border-[var(--gold)]/20 bg-[var(--gold)]/5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <MapPin className="w-4 h-4 text-[var(--gold)]" />
+                            <span className="text-[10px] uppercase font-mono tracking-widest">Terrain Reconnaissance</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 mb-4">
+                            {Array.from({ length: 8 }).map((_, i) => (
+                                <button 
+                                    key={i}
+                                    onClick={() => {
+                                        setChallengeProgress(prev => Math.min(100, prev + 12.5));
+                                        if (challengeProgress + 12.5 >= 100) {
+                                            gameService.updateGameState(room.id, { morale: 100 });
+                                        }
+                                    }}
+                                    className="aspect-square bg-white/5 border border-white/10 hover:border-[var(--gold)] transition-colors flex items-center justify-center"
+                                >
+                                    <div className="w-1 h-1 bg-[var(--gold)] rounded-full opacity-20" />
+                                </button>
+                            ))}
+                        </div>
+                        <div className="h-1 bg-white/5 w-full">
+                            <div className="h-full bg-[var(--gold)]" style={{ width: `${challengeProgress}%` }} />
+                        </div>
+                        <p className="text-[8px] uppercase tracking-tighter mt-2 text-center opacity-50">Scan sector for Mesha's movements</p>
+                    </div>
+
                     <div className="p-4 border border-[var(--gold)]/20 bg-white/5 space-y-4">
                         <p className="text-xs font-bold uppercase tracking-tight">{STORY_BEATS.REBELLION.question}</p>
                         <div className="grid grid-cols-1 gap-2">
@@ -303,19 +343,51 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
                 key="victory"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center p-8 bg-[var(--ink)] border border-[var(--gold)] text-center"
+                className="flex flex-col items-center justify-center p-8 bg-[var(--ink)] border border-[var(--gold)] text-center min-h-[60vh] relative overflow-hidden"
             >
-                <Trophy className="w-16 h-16 text-[var(--gold)] mb-4" />
-                <h2 className="text-3xl font-bold uppercase text-[var(--gold)] mb-2">Victory</h2>
-                <p className="text-xs text-[var(--sand)] opacity-60 mb-8 lowercase font-mono italic">
-                    The Moabite army was deceived by the red water. The siege of Kir-Hareseth is won.
-                </p>
-                <button 
-                    className="flex items-center gap-2 px-8 py-3 bg-[var(--gold)] text-[var(--ink)] font-bold uppercase text-xs tracking-widest animate-pulse"
-                    onClick={() => gameService.updateGameState(room.id, { victoryAchieved: true })}
+                {/* Tactical Overlays */}
+                <div className="absolute top-0 left-0 w-full p-2 flex justify-between">
+                    <div className="text-[10px] text-[var(--gold)] font-mono uppercase tracking-widest">Target: Moav Camp</div>
+                    <div className="text-[10px] text-red-500 font-mono uppercase tracking-widest">Signal: Red Alert</div>
+                </div>
+
+                <motion.div
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                  className="mb-8"
                 >
-                    <Sword className="w-4 h-4" />
-                    Final Charge
+                  <Trophy className="w-20 h-20 text-[var(--gold)] mb-4 drop-shadow-[0_0_15px_rgba(197,160,89,0.5)]" />
+                </motion.div>
+
+                <h2 className="text-4xl font-bold uppercase text-[var(--gold)] mb-2 tracking-tighter">FINAL CHARGE</h2>
+                <p className="text-xs text-[var(--sand)] opacity-60 mb-8 lowercase font-mono italic max-w-xs">
+                    Tap in unison with your fellow commanders to breach the walls!
+                </p>
+
+                <div className="w-full max-w-xs h-4 bg-white/5 border border-[var(--gold)]/20 mb-8 relative">
+                   <motion.div 
+                      className="absolute inset-y-0 left-0 bg-[var(--gold)]"
+                      style={{ width: `${Math.min(100, (tapCount / 50) * 100)}%` }}
+                   />
+                   <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[8px] font-mono text-[var(--sand)] uppercase mix-blend-difference">Power Level: {Math.floor((tapCount / 50) * 100)}%</span>
+                   </div>
+                </div>
+
+                <button 
+                    className={cn(
+                      "group relative w-32 h-32 rounded-full border-4 flex items-center justify-center transition-all active:scale-95",
+                      tapCount >= 50 ? "border-green-500 bg-green-500/20" : "border-[var(--gold)] bg-[var(--gold)]/10"
+                    )}
+                    onClick={() => {
+                        setTapCount(prev => prev + 1);
+                        if (tapCount + 1 >= 50) {
+                          gameService.updateGameState(room.id, { victoryAchieved: true });
+                        }
+                    }}
+                >
+                    <Sword className={cn("w-12 h-12 transition-all", tapCount >= 50 ? "text-green-500" : "text-[var(--gold)] group-hover:scale-110")} />
+                    <div className="absolute -bottom-12 font-mono text-[10px] uppercase text-[var(--gold)]">Charge Energy</div>
                 </button>
             </motion.div>
         )}

@@ -149,5 +149,15 @@ export const gameService = {
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}/players/${playerId}`);
     }
+  },
+
+  async updatePlayerScore(roomId: string, playerId: string, points: number) {
+    try {
+      await updateDoc(doc(db, `${ROOMS_COLLECTION}/${roomId}/players`, playerId), {
+        score: increment(points)
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}/players/${playerId}`);
+    }
   }
 };
