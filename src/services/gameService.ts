@@ -14,7 +14,7 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Room, GamePhase, GameState, Team, Player, PlayerRole } from '../types';
+import { Room, GamePhase, GameState, Team, Player, AllianceStrategy, EndState } from '../types';
 import { generateJoinCode } from '../lib/utils';
 
 const ROOMS_COLLECTION = 'rooms';
@@ -27,13 +27,16 @@ export const gameService = {
     const initialGameState: GameState = {
       stamina: 100,
       water: 100,
-      morale: 100,
+      allianceIntegrity: 100,
       currentPhase: GamePhase.LOBBY,
       phaseStartTime: Date.now(),
-      allianceBuilt: false,
-      crisisSolved: false,
-      miracleTriggered: false,
-      victoryAchieved: false,
+      strategiesLocked: {},
+      crisisResolved: false,
+      ambushTaps: 0,
+      ambushSuccess: null,
+      votesEradicate: 0,
+      votesWithdraw: 0,
+      endState: EndState.NONE,
       lastAction: 'Room Created'
     };
 
@@ -71,7 +74,7 @@ export const gameService = {
         id: userId,
         name: playerName,
         team: null,
-        role: PlayerRole.UNASSIGNED,
+        strategy: AllianceStrategy.UNASSIGNED,
         isHost: false,
         score: 0
       };
@@ -134,6 +137,36 @@ export const gameService = {
     }
   },
 
+  async incrementAmbushTaps(roomId: string) {
+    try {
+      await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
+        'gameState.ambushTaps': increment(1)
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}`);
+    }
+  },
+
+  async castVoteEradicate(roomId: string) {
+    try {
+      await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
+        'gameState.votesEradicate': increment(1)
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}`);
+    }
+  },
+
+  async castVoteWithdraw(roomId: string) {
+    try {
+      await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
+        'gameState.votesWithdraw': increment(1)
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}`);
+    }
+  },
+
   async assignTeams(roomId: string, players: Player[]) {
     const teams: Team[] = [Team.YISRAEL, Team.YEHUDAH, Team.EDOM];
     const updates = players.map((player, index) => {
@@ -143,9 +176,9 @@ export const gameService = {
     await Promise.all(updates);
   },
 
-  async setPlayerRole(roomId: string, playerId: string, role: PlayerRole) {
+  async setPlayerStrategy(roomId: string, playerId: string, strategy: AllianceStrategy) {
     try {
-      await updateDoc(doc(db, `${ROOMS_COLLECTION}/${roomId}/players`, playerId), { role });
+      await updateDoc(doc(db, `${ROOMS_COLLECTION}/${roomId}/players`, playerId), { strategy });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}/players/${playerId}`);
     }

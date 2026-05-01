@@ -3,53 +3,41 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GamePhase, Team, PlayerRole } from './types';
+import { GamePhase, Team, AllianceStrategy } from './types';
 
 export const STORY_BEATS = {
-  REBELLION: {
-    title: "The Rebellion of Mesha",
-    conflict: "King Mesha of Moav has stopped the sheep tax (100,000 lambs and 100,000 rams with wool). King Yehoram of Yisrael gathers an alliance.",
-    question: "Why did the kings form an alliance?",
-    options: [
-      "To share the wealth of Moav",
-      "Because they shared a common enemy and route",
-      "Because Elisha told them to",
-      "To conquer the mountains of Edom"
-    ],
-    correctIndex: 1,
-    learning: "The alliance was strategic, involving Yisrael, Yehudah, and the King of Edom, taking the long way through the wilderness of Edom."
+  ALLIANCE: {
+    title: "The Coalition Formation",
+    description: "King Mesha of Moav has rebelled. King Yehoram of Yisrael gathers an alliance of three kings."
+  },
+  TREK: {
+    title: "The Long March",
+    description: "The armies march through the wilderness of Edom..."
   },
   CRISIS: {
-    title: "Seven Days in the Wilderness",
-    problem: "The armies have marched for seven days and there is no water for the camp or the animals.",
-    question: "Rabbi Alex Israel’s commentary: why was this a 'Logistical Error'?",
+    title: "The Logistical Error",
+    crisis: "Seven days in the wilderness, and there is no water. The kings are stranded.",
+    question: "Why does Elisha mock the King of Yisrael?",
     options: [
-      "They forgot to pack enough goatskins",
-      "They got lost in a sandstorm",
-      "A wadi they relied on was likely blocked or dry",
-      "The King of Edom betrayed them"
-    ],
-    correctIndex: 2,
-    learning: "A wadi is a dry riverbed that fills during flash floods. The kings expected water, but found none."
-  },
-  MIRACLE: {
-    title: "The Hand of the Prophet",
-    tension: "Yehoram despairs, but Yehoshaphat asks for a prophet of Hashem. They find Elisha ben Shafat.",
-    question: "Why was Elisha reluctant to help the King of Yisrael?",
-    options: [
-      "He wanted more gold",
-      "Because of theKing's wicked behavior and his parents' prophets (Achav and Izebel)",
-      "He didn't know the way to Moav",
-      "He was busy with other miracles"
+      "Because the army is too small",
+      "Due to the king's idolatrous lineage (Achav and Izebel)",
+      "Because they marched without consulting a map",
+      "Because they forgot goatskins"
     ],
     correctIndex: 1,
-    learning: "Elisha only helped out of respect for King Yehoshaphat of Yehudah."
+    learning: "Elisha only helps out of respect for King Yehoshaphat of Yehudah. He demands a musician, and prophecies that water will fill the valley without wind or rain."
   },
-  VICTORY: {
-    title: "Red Water of Moav",
-    twist: "In the morning, without rain, the trenches filled with water. To the Moabites, it looked like blood.",
-    action: "CHARGE THE MOABITE CAMP!",
-    resolution: "The alliance defeats Moav, destroys their cities, and stops their wells. The King of Moav makes a desperate sacrifice on the wall."
+  MIRACLE: {
+    title: "The Wadi Paradox Resolved",
+    description: "Water fills the trenches. But what does the enemy see?"
+  },
+  AMBUSH: {
+    title: "The Visual Deception",
+    description: "The morning sun reflects off the water, aided by the red Edomite terrain. Moav sees blood."
+  },
+  CROSSROADS: {
+    title: "The Final Stand",
+    description: "The King of Moav, cornered at Kir-Hareseth, sacrifices his firstborn son on the wall. A great wrath comes upon Yisrael."
   }
 };
 
@@ -57,9 +45,9 @@ export const COLORS = {
   sand: "#E6D5B8",
   ink: "#1A1A1B",
   gold: "#C5A059",
-  red: "#8B0000",
-  desert_bg: "#F4E3C1",
-  accent: "#D4AF37"
+  bloodRed: "#8B0000",
+  waterBlue: "#005C8A",
+  desert_bg: "#F4E3C1"
 };
 
 export const TEAM_NAMES: Record<Team, string> = {
@@ -68,9 +56,21 @@ export const TEAM_NAMES: Record<Team, string> = {
   [Team.EDOM]: "Kingdom of Edom"
 };
 
-export const ROLE_DESCRIPTIONS: Record<PlayerRole, string> = {
-  [PlayerRole.SCOUT]: "Finds hidden paths and resources.",
-  [PlayerRole.WATER_BEARER]: "Manages and preserves water supply.",
-  [PlayerRole.TACTICIAN]: "Coordinates the team in battle.",
-  [PlayerRole.UNASSIGNED]: "Waiting for role selection..."
+export const STRATEGY_DESCRIPTIONS: Record<AllianceStrategy, { name: string, desc: string, ability: string }> = {
+  [AllianceStrategy.CAUTIOUS]: { 
+    name: "The Cautious Path", 
+    desc: "A meticulous approach favored by Yehudah.", 
+    ability: "Prophetic Insight: Prevents complete alliance integrity loss." 
+  },
+  [AllianceStrategy.AGGRESSIVE]: { 
+    name: "The Aggressive Path", 
+    desc: "A fast, high-resource approach by Yisrael.", 
+    ability: "Rapid Deployment: Moves fast but consumes extra stamina." 
+  },
+  [AllianceStrategy.SCOUT]: { 
+    name: "The Scout Path", 
+    desc: "Utilize local knowledge of Edom.", 
+    ability: "Fog-of-War Removal: Acts as the team's eyes in the wilderness." 
+  },
+  [AllianceStrategy.UNASSIGNED]: { name: "Unassigned", desc: "Awaiting strategy.", ability: "None" }
 };

@@ -28,22 +28,22 @@ service cloud.firestore {
     function isValidRoom(data) {
       return data.keys().hasAll(['code', 'status', 'hostId', 'gameState', 'playersCount']) &&
              data.code is string && data.code.size() == 4 &&
-             data.status in ['LOBBY', 'REBELLION', 'CRISIS', 'MIRACLE', 'VICTORY', 'END'] &&
+             data.status in ['LOBBY', 'ALLIANCE', 'TREK', 'CRISIS', 'MIRACLE', 'AMBUSH', 'CROSSROADS', 'END'] &&
              data.hostId is string &&
              data.gameState is map &&
-             data.gameState.keys().hasAll(['stamina', 'water', 'morale', 'currentPhase']) &&
+             data.gameState.keys().hasAll(['stamina', 'water', 'allianceIntegrity', 'currentPhase']) &&
              data.gameState.stamina is number &&
              data.gameState.water is number &&
-             data.gameState.morale is number &&
+             data.gameState.allianceIntegrity is number &&
              data.playersCount is number;
     }
 
     function isValidPlayer(data) {
-      return data.keys().hasAll(['name', 'isHost', 'score', 'role']) &&
+      return data.keys().hasAll(['name', 'isHost', 'score', 'strategy']) &&
              data.name is string && data.name.size() <= 32 &&
              data.isHost is bool &&
              data.score is number &&
-             data.role in ['SCOUT', 'WATER_BEARER', 'TACTICIAN', 'UNASSIGNED'];
+             data.strategy in ['CAUTIOUS', 'AGGRESSIVE', 'SCOUT', 'UNASSIGNED'];
     }
 
     // Rooms Collection
@@ -71,10 +71,10 @@ service cloud.firestore {
                     get(/databases/$(database)/documents/rooms/$(roomId)).data.status == 'LOBBY';
       
       allow update: if isSignedIn() && (
-        // Self-Update: Change role or team
+        // Self-Update: Change strategy or team
         (playerId == request.auth.uid && 
          isValidPlayer(incoming()) && 
-         incoming().diff(existing()).affectedKeys().hasAny(['role', 'team', 'name', 'score'])) ||
+         incoming().diff(existing()).affectedKeys().hasAny(['strategy', 'team', 'name', 'score'])) ||
          
         // Host-Update: Rebalance teams
         (get(/databases/$(database)/documents/rooms/$(roomId)).data.hostId == request.auth.uid &&

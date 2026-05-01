@@ -5,11 +5,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Sword, Droplets, MapPin, Send, MessageSquare } from 'lucide-react';
+import { Shield, Sword, Droplets, MapPin, Send, MessageSquare, AlertTriangle, Eye, Crosshair } from 'lucide-react';
 import { gameService } from '../services/gameService';
-import { Room, GamePhase, Player, Team, PlayerRole } from '../types';
-import { ROLE_DESCRIPTIONS, TEAM_NAMES, STORY_BEATS } from '../constants';
+import { Room, GamePhase, Player, Team, AllianceStrategy, EndState } from '../types';
+import { STRATEGY_DESCRIPTIONS, TEAM_NAMES, STORY_BEATS } from '../constants';
 import { cn } from '../lib/utils';
+import { increment } from 'firebase/firestore';
 
 interface PlayerViewProps {
   userId: string;
@@ -25,19 +26,8 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
   const [player, setPlayer] = useState<Player | null>(null);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
-  const [selectedRole, setSelectedRole] = useState<PlayerRole>(PlayerRole.UNASSIGNED);
-  const [tapCount, setTapCount] = useState(0);
-  const [challengeProgress, setChallengeProgress] = useState(0);
-
-  // Challenge logic for Victory Phase
-  useEffect(() => {
-    if (room?.status === GamePhase.VICTORY && tapCount > 0) {
-      const timeout = setTimeout(() => {
-        gameService.updatePlayerScore(roomId!, userId, tapCount);
-      }, 500);
-      return () => clearTimeout(timeout);
-    }
-  }, [tapCount, room?.status, roomId, userId]);
+  const [selectedStrategy, setSelectedStrategy] = useState<AllianceStrategy>(AllianceStrategy.UNASSIGNED);
+  const [voted, setVoted] = useState(false);
 
   // Auto-join from URL if code present
   useEffect(() => {
@@ -56,7 +46,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
         const me = players.find(p => p.id === userId);
         if (me) {
             setPlayer(me);
-            setSelectedRole(me.role);
+            setSelectedStrategy(me.strategy);
         }
       });
       return () => {
@@ -71,7 +61,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
     if (!joinCode || !playerName) return;
     setJoining(true);
     setError('');
-    const id = await gameService.joinRoom(joinCode, playerName, userId);
+    const id = await gameService.joinRoom(joinCode.toUpperCase(), playerName, userId);
     if (id) {
       setRoomId(id);
     } else {
@@ -80,9 +70,26 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
     setJoining(false);
   };
 
-  const handleRoleSelect = async (role: PlayerRole) => {
+  const handleStrategySelect = async (strategy: AllianceStrategy) => {
     if (roomId) {
-      await gameService.setPlayerRole(roomId, userId, role);
+      await gameService.setPlayerStrategy(roomId, userId, strategy);
+    }
+  };
+
+  const handleTap = () => {
+    if (room && room.status === GamePhase.AMBUSH) {
+      gameService.incrementAmbushTaps(room.id);
+    }
+  };
+
+  const castVote = (isEradicate: boolean) => {
+    if (room && !voted) {
+      setVoted(true);
+      if (isEradicate) {
+        gameService.castVoteEradicate(room.id);
+      } else {
+        gameService.castVoteWithdraw(room.id);
+      }
     }
   };
 
@@ -95,16 +102,16 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
           className="w-full max-w-sm bg-[var(--ink)] text-[var(--sand)] p-8 border border-[var(--gold)] shadow-2xl"
         >
           <div className="flex justify-center mb-6">
-            <Sword className="w-12 h-12 text-[var(--gold)]" />
+            <Shield className="w-12 h-12 text-[var(--gold)]" />
           </div>
-          <h2 className="text-2xl font-bold uppercase text-center mb-8 tracking-tight">Alliance Mobilization</h2>
+          <h2 className="text-2xl font-bold uppercase text-center mb-8 tracking-tight">Tactical Uplink</h2>
           
           <form onSubmit={handleJoin} className="space-y-6">
             <div>
-              <label className="block text-[8px] uppercase tracking-widest opacity-50 mb-1 font-mono">Identification</label>
+              <label className="block text-[8px] uppercase tracking-widest opacity-50 mb-1 font-mono">Commander Designation</label>
               <input 
                 type="text" 
-                placeholder="COMMANDER NAME"
+                placeholder="YOUR NAME"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value.toUpperCase())}
                 className="w-full bg-transparent border-b border-[var(--gold)] p-3 text-sm focus:outline-none focus:border-white transition-colors"
@@ -112,14 +119,14 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
               />
             </div>
             <div>
-              <label className="block text-[8px] uppercase tracking-widest opacity-50 mb-1 font-mono">Tactical Code</label>
+              <label className="block text-[8px] uppercase tracking-widest opacity-50 mb-1 font-mono">Transmission Code</label>
               <input 
                 type="text" 
                 placeholder="4-DIGIT CODE"
                 maxLength={4}
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
-                className="w-full bg-transparent border-b border-[var(--gold)] p-3 text-sm font-mono tracking-[1em] text-center focus:outline-none focus:border-white transition-colors"
+                className="w-full bg-transparent border-b border-[var(--gold)] p-3 text-sm font-mono tracking-[1em] text-center focus:outline-none focus:border-white transition-colors uppercase"
                 required
               />
             </div>
@@ -131,7 +138,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
               disabled={joining}
               className="w-full bg-[var(--gold)] text-[var(--ink)] py-4 font-bold uppercase tracking-widest hover:brightness-110 disabled:opacity-50 transition-all"
             >
-              {joining ? 'TRANSMITTING...' : 'JOIN COMMAND'}
+              {joining ? 'TRANSMITTING...' : 'JOIN UNIFIED COMMAND'}
             </button>
 
             <button 
@@ -139,7 +146,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
               onClick={onBack}
               className="w-full text-[var(--gold)]/50 text-[10px] uppercase font-mono mt-4 text-center hover:text-[var(--gold)]"
             >
-              Back to Main
+              Abort Connection
             </button>
           </form>
         </motion.div>
@@ -150,13 +157,13 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
   if (!room || !player) {
     return (
        <div className="flex items-center justify-center min-h-screen">
-          <div className="font-mono text-sm animate-pulse">Syncing with HQ...</div>
+          <div className="font-mono text-sm animate-pulse text-[var(--gold)]">Decrypting Handshake...</div>
        </div>
     );
   }
 
   return (
-    <div className="p-4 pt-24 min-h-screen">
+    <div className="p-4 pt-24 min-h-screen relative overflow-hidden">
       <AnimatePresence mode="wait">
         {room.status === GamePhase.LOBBY && (
           <motion.div 
@@ -164,108 +171,77 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="space-y-6"
+            className="flex flex-col items-center justify-center text-center h-[60vh]"
           >
-            {/* Team/Role Assignment */}
+             <div className="font-mono text-xs uppercase text-[var(--gold)] animate-pulse tracking-widest">
+                 Standby. Awaiting host initialization.
+             </div>
+          </motion.div>
+        )}
+
+        {room.status === GamePhase.ALLIANCE && (
+          <motion.div 
+            key="alliance"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="space-y-6 relative z-10"
+          >
+            {/* Team/Strategy Assignment */}
             <div className="bg-[var(--ink)] p-6 border border-[var(--gold)]">
-                <div className="text-[10px] uppercase tracking-widest opacity-50 mb-2">Authenticated User</div>
+                <div className="text-[10px] uppercase tracking-widest opacity-50 mb-2">Authenticated Commander</div>
                 <div className="text-xl font-bold text-[var(--sand)] uppercase mb-4">{player.name}</div>
                 
                 {player.team ? (
                     <div className="p-4 bg-[var(--gold)]/10 border border-[var(--gold)]/30 mb-6">
-                        <div className="text-[10px] uppercase tracking-widest text-[var(--gold)] mb-1">Assigned Kingdom</div>
+                        <div className="text-[10px] uppercase tracking-widest text-[var(--gold)] mb-1">Assigned Faction</div>
                         <div className="text-lg font-bold text-[var(--sand)] uppercase">{TEAM_NAMES[player.team]}</div>
                     </div>
                 ) : (
                     <div className="p-4 bg-red-500/10 border border-red-500/30 mb-6 animate-pulse">
-                        <div className="text-[10px] uppercase tracking-widest text-red-500">Awaiting Deployment</div>
+                        <div className="text-[10px] uppercase tracking-widest text-red-500">Awaiting Faction Assignment</div>
                     </div>
                 )}
 
-                <h3 className="text-xs uppercase tracking-tighter mb-4 text-[var(--sand)]">Specialization</h3>
+                <h3 className="text-xs uppercase tracking-tighter mb-4 text-[var(--sand)]">Lock In Operational Strategy</h3>
                 <div className="grid grid-cols-1 gap-3">
-                    {[PlayerRole.SCOUT, PlayerRole.WATER_BEARER, PlayerRole.TACTICIAN].map(role => (
+                    {[AllianceStrategy.CAUTIOUS, AllianceStrategy.AGGRESSIVE, AllianceStrategy.SCOUT].map(strategy => (
                         <button
-                            key={role}
-                            onClick={() => handleRoleSelect(role)}
+                            key={strategy}
+                            onClick={() => handleStrategySelect(strategy)}
                             className={cn(
                                 "p-4 text-left border transition-all",
-                                selectedRole === role 
+                                selectedStrategy === strategy 
                                     ? "bg-[var(--gold)] border-[var(--gold)] text-[var(--ink)]" 
                                     : "bg-transparent border-[var(--gold)]/30 text-[var(--sand)] hover:bg-[var(--gold)]/5"
                             )}
                         >
-                            <div className="font-bold uppercase text-sm mb-1">{role}</div>
-                            <div className="text-[10px] opacity-70 leading-tight">{ROLE_DESCRIPTIONS[role]}</div>
+                            <div className="font-bold uppercase text-sm mb-1">{STRATEGY_DESCRIPTIONS[strategy].name}</div>
+                            <div className="text-[10px] opacity-70 leading-tight mb-2">{STRATEGY_DESCRIPTIONS[strategy].desc}</div>
+                            <div className="text-[8px] font-mono text-[var(--gold)] uppercase bg-black/50 p-1 pl-2 border-l border-[var(--gold)] mix-blend-difference">{STRATEGY_DESCRIPTIONS[strategy].ability}</div>
                         </button>
                     ))}
                 </div>
             </div>
             
             <div className="text-center text-[10px] uppercase tracking-widest text-[var(--ink)]/50 font-mono">
-                Observe the Great Screen for further orders.
+                Verify choices on the Unified Command Screen.
             </div>
           </motion.div>
         )}
 
-        {room.status === GamePhase.REBELLION && (
+        {room.status === GamePhase.TREK && (
            <motion.div 
-             key="rebellion"
+             key="trek"
              initial={{ opacity: 0 }}
              animate={{ opacity: 1 }}
-             className="space-y-6"
+             className="flex flex-col items-center justify-center p-8 bg-[var(--ink)] border border-[var(--gold)] text-center min-h-[50vh]"
            >
-                <div className="bg-[var(--ink)] p-6 border border-[var(--gold)]">
-                    <h2 className="text-xl font-bold uppercase text-[var(--gold)] mb-2">{STORY_BEATS.REBELLION.title}</h2>
-                    <p className="text-[var(--sand)]/80 text-sm mb-6">{STORY_BEATS.REBELLION.conflict}</p>
-                    
-                    {/* Interactive Scan Challenge */}
-                    <div className="mb-6 p-4 border border-[var(--gold)]/20 bg-[var(--gold)]/5">
-                        <div className="flex items-center gap-2 mb-4">
-                            <MapPin className="w-4 h-4 text-[var(--gold)]" />
-                            <span className="text-[10px] uppercase font-mono tracking-widest">Terrain Reconnaissance</span>
-                        </div>
-                        <div className="grid grid-cols-4 gap-2 mb-4">
-                            {Array.from({ length: 8 }).map((_, i) => (
-                                <button 
-                                    key={i}
-                                    onClick={() => {
-                                        setChallengeProgress(prev => Math.min(100, prev + 12.5));
-                                        if (challengeProgress + 12.5 >= 100) {
-                                            gameService.updateGameState(room.id, { morale: 100 });
-                                        }
-                                    }}
-                                    className="aspect-square bg-white/5 border border-white/10 hover:border-[var(--gold)] transition-colors flex items-center justify-center"
-                                >
-                                    <div className="w-1 h-1 bg-[var(--gold)] rounded-full opacity-20" />
-                                </button>
-                            ))}
-                        </div>
-                        <div className="h-1 bg-white/5 w-full">
-                            <div className="h-full bg-[var(--gold)]" style={{ width: `${challengeProgress}%` }} />
-                        </div>
-                        <p className="text-[8px] uppercase tracking-tighter mt-2 text-center opacity-50">Scan sector for Mesha's movements</p>
-                    </div>
-
-                    <div className="p-4 border border-[var(--gold)]/20 bg-white/5 space-y-4">
-                        <p className="text-xs font-bold uppercase tracking-tight">{STORY_BEATS.REBELLION.question}</p>
-                        <div className="grid grid-cols-1 gap-2">
-                             {STORY_BEATS.REBELLION.options.map((opt, i) => (
-                                 <button 
-                                    key={i} 
-                                    onClick={() => {
-                                      if (i === STORY_BEATS.REBELLION.correctIndex) {
-                                        gameService.updateGameState(room.id, { morale: Math.min(100, (room.gameState.morale || 100) + 10) });
-                                      }
-                                    }}
-                                    className="p-3 text-left border border-[var(--gold)]/30 text-[var(--sand)] text-xs hover:bg-[var(--gold)]/10 active:bg-green-600/20"
-                                  >
-                                     {opt}
-                                 </button>
-                             ))}
-                        </div>
-                    </div>
-                </div>
+              <Droplets className="w-16 h-16 text-blue-500 mb-6 opacity-50" />
+              <h2 className="text-2xl font-bold uppercase text-[var(--gold)] tracking-tighter mb-4">March through Edom</h2>
+              <div className="text-[10px] font-mono text-[var(--sand)] uppercase tracking-widest opacity-60">
+                 Watch the Master Map. Monitor water reserves.
+              </div>
            </motion.div>
         )}
 
@@ -274,27 +250,29 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
                 key="crisis"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="space-y-6"
+                className="space-y-6 relative z-10"
             >
                 <div className="bg-red-600/10 p-6 border border-red-600/40">
-                    <h2 className="text-xl font-bold uppercase text-red-600 mb-2">{STORY_BEATS.CRISIS.title}</h2>
-                    <p className="text-[var(--sand)]/80 text-sm mb-6">{STORY_BEATS.CRISIS.problem}</p>
+                    <h2 className="text-xl font-bold uppercase text-red-600 mb-2">EDUCATIONAL INTERVENTION</h2>
+                    <p className="text-[var(--sand)]/80 text-sm mb-6">Wadi Paradox Detected. The army lacks water.</p>
                     
-                    <div className="p-4 border border-red-600/30 bg-black/20 space-y-4">
-                        <p className="text-xs font-bold uppercase tracking-tight text-red-500">Logistics Puzzle</p>
-                        <p className="text-[10px] text-[var(--sand)] opacity-60 leading-relaxed italic">
-                            Analyzing wadi topography... Rabbi Alex Israel notes: The army wouldn't make a simple error.
+                    <div className="p-4 bg-black/50 border border-red-600/30">
+                        <p className="text-[10px] text-[var(--sand)] opacity-60 leading-relaxed italic mb-4">
+                            "They are not incompetent. The topography of the desert..."
                         </p>
+                        <p className="text-xs font-bold uppercase tracking-tight text-red-500 mb-4">{STORY_BEATS.CRISIS.question}</p>
                         <div className="grid grid-cols-1 gap-2">
                              {STORY_BEATS.CRISIS.options.map((opt, i) => (
                                  <button 
                                     key={i} 
                                     onClick={() => {
                                       if (i === STORY_BEATS.CRISIS.correctIndex) {
-                                        gameService.updateGameState(room.id, { water: 100, crisisSolved: true });
+                                        gameService.updateGameState(room.id, { crisisResolved: true, water: 100 });
+                                      } else {
+                                        gameService.updateGameState(room.id, { stamina: Math.max(0, room.gameState.stamina - 10) });
                                       }
                                     }}
-                                    className="p-3 text-left border border-red-600/30 text-[var(--sand)] text-xs hover:bg-red-600/20 active:bg-green-600/20 transition-colors"
+                                    className="p-3 text-left border border-red-600/30 text-[var(--sand)] text-[10px] hover:bg-red-600/20 active:bg-green-600/20 transition-colors uppercase font-mono tracking-wider"
                                 >
                                      {opt}
                                  </button>
@@ -310,86 +288,101 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
                 key="miracle"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="space-y-6"
+                className="flex flex-col items-center justify-center p-12 bg-blue-900/20 border border-blue-500/50 text-center min-h-[50vh]"
             >
-                <div className="bg-blue-600/10 p-6 border border-blue-600/40">
-                    <h2 className="text-xl font-bold uppercase text-blue-400 mb-2">{STORY_BEATS.MIRACLE.title}</h2>
-                    <p className="text-[var(--sand)]/80 text-sm mb-6">"Is there not here a prophet of Hashem?"</p>
-                    
-                    <div className="p-4 border border-blue-600/30 bg-black/20 space-y-4">
-                        <p className="text-xs font-bold uppercase tracking-tight text-blue-400">Consult the Prophet</p>
-                        <div className="grid grid-cols-1 gap-2">
-                             {STORY_BEATS.MIRACLE.options.map((opt, i) => (
-                                 <button 
-                                    key={i} 
-                                    onClick={() => {
-                                      if (i === STORY_BEATS.MIRACLE.correctIndex) {
-                                        gameService.updateGameState(room.id, { morale: 100, miracleTriggered: true });
-                                      }
-                                    }}
-                                    className="p-3 text-left border border-blue-600/30 text-[var(--sand)] text-xs hover:bg-blue-600/20 active:bg-green-600/20"
-                                >
-                                     {opt}
-                                 </button>
-                             ))}
-                        </div>
-                    </div>
+                <Eye className="w-20 h-20 text-blue-400 mb-6 drop-shadow-[0_0_10px_rgba(0,100,255,0.8)]" />
+                <h2 className="text-3xl font-bold uppercase text-blue-300 tracking-tighter mb-4">Miracle Active</h2>
+                <div className="text-[10px] font-mono text-blue-200 uppercase tracking-widest">
+                   The wadi is filled. Prepare for tactical execution.
                 </div>
            </motion.div>
         )}
 
-        {room.status === GamePhase.VICTORY && (
+        {room.status === GamePhase.AMBUSH && (
              <motion.div 
-                key="victory"
+                key="ambush"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center p-8 bg-[var(--ink)] border border-[var(--gold)] text-center min-h-[60vh] relative overflow-hidden"
+                className="flex flex-col items-center justify-center p-8 bg-[#300000] border-2 border-red-500 text-center min-h-[60vh] relative overflow-hidden"
             >
-                {/* Tactical Overlays */}
                 <div className="absolute top-0 left-0 w-full p-2 flex justify-between">
-                    <div className="text-[10px] text-[var(--gold)] font-mono uppercase tracking-widest">Target: Moav Camp</div>
-                    <div className="text-[10px] text-red-500 font-mono uppercase tracking-widest">Signal: Red Alert</div>
+                    <div className="text-[10px] text-red-500 font-mono uppercase tracking-widest opacity-50">Target: Moav Vanguard</div>
+                    <div className="text-[10px] text-red-500 font-mono uppercase tracking-widest font-bold animate-pulse">AMBUSH IN PROGRESS</div>
                 </div>
 
                 <motion.div
                   animate={{ scale: [1, 1.05, 1] }}
-                  transition={{ duration: 0.5, repeat: Infinity }}
-                  className="mb-8"
+                  transition={{ duration: 0.2, repeat: Infinity }}
+                  className="mb-8 mt-4"
                 >
-                  <Trophy className="w-20 h-20 text-[var(--gold)] mb-4 drop-shadow-[0_0_15px_rgba(197,160,89,0.5)]" />
+                  <Crosshair className="w-24 h-24 text-red-500 mb-4 drop-shadow-[0_0_15px_rgba(255,0,0,0.8)]" />
                 </motion.div>
 
-                <h2 className="text-4xl font-bold uppercase text-[var(--gold)] mb-2 tracking-tighter">FINAL CHARGE</h2>
-                <p className="text-xs text-[var(--sand)] opacity-60 mb-8 lowercase font-mono italic max-w-xs">
-                    Tap in unison with your fellow commanders to breach the walls!
+                <h2 className="text-4xl font-bold uppercase text-red-500 mb-2 tracking-tighter">SYNCHRONIZE STRIKE</h2>
+                <p className="text-[10px] text-red-300 opacity-80 mb-12 uppercase font-mono tracking-widest max-w-[200px]">
+                    Tap rapidly to increase ambush power!
                 </p>
 
-                <div className="w-full max-w-xs h-4 bg-white/5 border border-[var(--gold)]/20 mb-8 relative">
-                   <motion.div 
-                      className="absolute inset-y-0 left-0 bg-[var(--gold)]"
-                      style={{ width: `${Math.min(100, (tapCount / 50) * 100)}%` }}
-                   />
-                   <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-[8px] font-mono text-[var(--sand)] uppercase mix-blend-difference">Power Level: {Math.floor((tapCount / 50) * 100)}%</span>
-                   </div>
-                </div>
-
                 <button 
-                    className={cn(
-                      "group relative w-32 h-32 rounded-full border-4 flex items-center justify-center transition-all active:scale-95",
-                      tapCount >= 50 ? "border-green-500 bg-green-500/20" : "border-[var(--gold)] bg-[var(--gold)]/10"
-                    )}
-                    onClick={() => {
-                        setTapCount(prev => prev + 1);
-                        if (tapCount + 1 >= 50) {
-                          gameService.updateGameState(room.id, { victoryAchieved: true });
-                        }
-                    }}
+                    className="group relative w-40 h-40 rounded-full border-4 border-red-500 flex items-center justify-center transition-all bg-red-600/20 active:scale-90 shadow-[0_0_30px_rgba(255,0,0,0.4)]"
+                    onPointerDown={handleTap}
                 >
-                    <Sword className={cn("w-12 h-12 transition-all", tapCount >= 50 ? "text-green-500" : "text-[var(--gold)] group-hover:scale-110")} />
-                    <div className="absolute -bottom-12 font-mono text-[10px] uppercase text-[var(--gold)]">Charge Energy</div>
+                    <Sword className="w-16 h-16 text-red-500 group-active:text-white" />
                 </button>
             </motion.div>
+        )}
+
+        {room.status === GamePhase.CROSSROADS && (
+             <motion.div 
+                key="crossroads"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center p-6 bg-black border border-white/20 text-center min-h-[60vh]"
+            >
+                <AlertTriangle className="w-16 h-16 text-[var(--sand)] mb-6 opacity-30" />
+                <h2 className="text-3xl font-bold uppercase text-[var(--sand)] tracking-tighter mb-4">Moral Crossroads</h2>
+                <p className="text-xs text-[var(--sand)]/80 mb-12 italic tracking-widest uppercase">
+                  Consensus Vote Required
+                </p>
+
+                {voted ? (
+                   <div className="text-[10px] font-mono uppercase tracking-widest text-[#C5A059] border border-[#C5A059]/30 p-4 bg-[#C5A059]/10">
+                     Vote logged. Awaiting total consensus on Unified Command.
+                   </div>
+                ) : (
+                  <div className="w-full space-y-4">
+                      <button 
+                          disabled={voted}
+                          onClick={() => castVote(true)}
+                          className="w-full bg-[#8B0000]/10 border border-[#8B0000]/50 p-6 flex flex-col items-center hover:bg-[#8B0000]/30 transition-colors"
+                      >
+                          <span className="text-lg font-bold text-[#8B0000] uppercase mb-1">Total Eradication</span>
+                          <span className="text-[8px] uppercase tracking-widest font-mono text-[#8B0000]/60">Press the advantage</span>
+                      </button>
+                      <button 
+                          disabled={voted}
+                          onClick={() => castVote(false)}
+                          className="w-full bg-blue-900/10 border border-blue-500/50 p-6 flex flex-col items-center hover:bg-blue-900/30 transition-colors"
+                      >
+                          <span className="text-lg font-bold text-blue-400 uppercase mb-1">Moral Withdrawal</span>
+                          <span className="text-[8px] uppercase tracking-widest font-mono text-blue-400/60">Cease fire. Retreat from Moav</span>
+                      </button>
+                  </div>
+                )}
+            </motion.div>
+        )}
+
+        {room.status === GamePhase.END && (
+             <motion.div 
+                key="end"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center p-12 text-center h-[60vh]"
+            >
+                <div className="text-[10px] font-mono text-[var(--sand)] uppercase tracking-widest">
+                   Simulation Terminated. Observe Main Display.
+                </div>
+           </motion.div>
         )}
       </AnimatePresence>
     </div>

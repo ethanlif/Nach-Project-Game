@@ -14,12 +14,14 @@ interface GameHeaderProps {
 }
 
 const PHASE_INFO = {
-  [GamePhase.LOBBY]: { icon: Swords, text: "Gathering the Alliance" },
-  [GamePhase.REBELLION]: { icon: MapIcon, text: "The Rebellion of Mesha" },
-  [GamePhase.CRISIS]: { icon: Droplets, text: "The Water Crisis" },
-  [GamePhase.MIRACLE]: { icon: Sparkles, text: "Elisha's Promise" },
-  [GamePhase.VICTORY]: { icon: Trophy, text: "The Victory at Moav" },
-  [GamePhase.END]: { icon: Trophy, text: "Victory Achieved" }
+  [GamePhase.LOBBY]: { icon: Swords, text: "Wait For Unified Command" },
+  [GamePhase.ALLIANCE]: { icon: MapIcon, text: "Form The Coalition" },
+  [GamePhase.TREK]: { icon: MapIcon, text: "The Great March" },
+  [GamePhase.CRISIS]: { icon: Droplets, text: "Logistical Error" },
+  [GamePhase.MIRACLE]: { icon: Sparkles, text: "Prophetic Intervention" },
+  [GamePhase.AMBUSH]: { icon: Swords, text: "Moabite Counter-Charge" },
+  [GamePhase.CROSSROADS]: { icon: MapIcon, text: "The Kings' Dilemma" },
+  [GamePhase.END]: { icon: Trophy, text: "End of Simulation" }
 };
 
 export const GameHeader: React.FC<GameHeaderProps> = ({ phase }) => {

@@ -11,7 +11,7 @@
         },
         "status": {
           "type": "string",
-          "enum": ["LOBBY", "REBELLION", "CRISIS", "MIRACLE", "VICTORY", "END"],
+          "enum": ["LOBBY", "ALLIANCE", "TREK", "CRISIS", "MIRACLE", "AMBUSH", "CROSSROADS", "END"],
           "description": "Current phase of the game"
         },
         "hostId": {
@@ -23,16 +23,19 @@
           "properties": {
             "stamina": { "type": "number" },
             "water": { "type": "number" },
-            "morale": { "type": "number" },
+            "allianceIntegrity": { "type": "number" },
             "currentPhase": { "type": "string" },
             "phaseStartTime": { "type": "number" },
-            "allianceBuilt": { "type": "boolean" },
-            "crisisSolved": { "type": "boolean" },
-            "miracleTriggered": { "type": "boolean" },
-            "victoryAchieved": { "type": "boolean" },
+            "strategiesLocked": { "type": "object" },
+            "crisisResolved": { "type": "boolean" },
+            "ambushTaps": { "type": "number" },
+            "ambushSuccess": { "type": "boolean" },
+            "votesEradicate": { "type": "number" },
+            "votesWithdraw": { "type": "number" },
+            "endState": { "type": "string" },
             "lastAction": { "type": "string" }
           },
-          "required": ["stamina", "water", "morale", "currentPhase"]
+          "required": ["stamina", "water", "allianceIntegrity", "currentPhase"]
         },
         "playersCount": {
           "type": "number"
@@ -47,12 +50,11 @@
       "properties": {
         "name": { "type": "string" },
         "team": { "type": "string", "enum": ["YISRAEL", "YEHUDAH", "EDOM", null] },
-        "role": { "type": "string", "enum": ["SCOUT", "WATER_BEARER", "TACTICIAN", "UNASSIGNED"] },
+        "strategy": { "type": "string", "enum": ["CAUTIOUS", "AGGRESSIVE", "SCOUT", "UNASSIGNED"] },
         "isHost": { "type": "boolean" },
-        "score": { "type": "number" },
-        "lastPing": { "type": "number" }
+        "score": { "type": "number" }
       },
-      "required": ["name", "isHost", "score", "role"]
+      "required": ["name", "isHost", "score", "strategy"]
     }
   },
   "firestore": {
