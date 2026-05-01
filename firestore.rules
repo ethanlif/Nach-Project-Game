@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Phase 4: Entity Validators
+    function isValidRoom(data) {
+      return data.keys().hasAll(['code', 'status', 'hostId', 'gameState', 'playersCount']) &&
+             data.code is string && data.code.size() == 4 &&
+             data.status in ['LOBBY', 'REBELLION', 'CRISIS', 'MIRACLE', 'VICTORY', 'END'] &&
+             data.hostId is string &&
+             data.gameState is map &&
+             data.gameState.keys().hasAll(['stamina', 'water', 'morale', 'currentPhase']) &&
+             data.gameState.stamina is number &&
+             data.gameState.water is number &&
+             data.gameState.morale is number &&
+             data.playersCount is number;
+    }
+
+    function isValidPlayer(data) {
+      return data.keys().hasAll(['name', 'isHost', 'score', 'role']) &&
+             data.name is string && data.name.size() <= 32 &&
+             data.isHost is bool &&
+             data.score is number &&
+             data.role in ['SCOUT', 'WATER_BEARER', 'TACTICIAN', 'UNASSIGNED'];
+    }
+
+    // Rooms Collection
+    match /rooms/{roomId} {
+      allow get: if true; // Public access for join
+      allow list: if false; 
+      
+      allow create: if isSignedIn() && isValidRoom(incoming()) && incoming().hostId == request.auth.uid;
+      
+      allow update: if isSignedIn() && (
+        // Host Action: Manage phase/state
+        (existing().hostId == request.auth.uid && isValidRoom(incoming())) ||
+        // Player Action: Just increment player count (atomic increment handled by server-side usually, but here we check)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['playersCount']))
+      );
+    }
+
+    // Players Subcollection
+    match /rooms/{roomId}/players/{playerId} {
+      allow read: if true; // Everyone in room can see players
+      
+      allow create: if isSignedIn() && 
+                    playerId == request.auth.uid && 
+                    isValidPlayer(incoming()) && 
+                    get(/databases/$(database)/documents/rooms/$(roomId)).data.status == 'LOBBY';
+      
+      allow update: if isSignedIn() && (
+        // Self-Update: Change role or team
+        (playerId == request.auth.uid && 
+         isValidPlayer(incoming()) && 
+         incoming().diff(existing()).affectedKeys().hasAny(['role', 'team', 'name', 'score'])) ||
+         
+        // Host-Update: Rebalance teams
+        (get(/databases/$(database)/documents/rooms/$(roomId)).data.hostId == request.auth.uid &&
+         isValidPlayer(incoming()) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['team']))
+      );
+      
+      allow delete: if isSignedIn() && (playerId == request.auth.uid || get(/databases/$(database)/documents/rooms/$(roomId)).data.hostId == request.auth.uid);
+    }
+  }
+}
