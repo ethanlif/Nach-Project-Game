@@ -32,6 +32,7 @@ export const gameService = {
       water: 100,
       allianceIntegrity: 100,
       dayMark: 0,
+      distance: 0,
       currentPhase: GamePhase.LOBBY,
       phaseStartTime: Date.now(),
       strategiesLocked: {},

@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { Users, Play, LogOut, Shield, Map as MapIcon, Droplets, Sparkles, Trophy, Sword, AlertTriangle, ArrowRight } from 'lucide-react';
 import { gameService } from '../services/gameService';
-import { Room, GamePhase, Player, Team, EndState } from '../types';
+import { Room, GamePhase, Player, Team, EndState, GameState } from '../types';
 import { COLORS, TEAM_NAMES, STORY_BEATS } from '../constants';
 import { cn } from '../lib/utils';
 import { DesertMap } from './game/DesertMap';
@@ -61,13 +61,12 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
       
       // Automatic resource drain and day progression during Trek
       if (room.status === GamePhase.TREK) {
-         let newDayMark = room.gameState.dayMark || 0;
+         let currentDistance = room.gameState.distance || 0;
+         let newDayMark = Math.floor(currentDistance / 10); // Every 10 distance = 1 day (70 distance = 7 days)
          let shouldUpdate = false;
          let updates: Partial<GameState> = {};
 
-         // Every 4 ticks, increase the day mark (makes the 7 day period take 28 seconds)
-         if (ticker > 0 && ticker % 4 === 0 && newDayMark < 7) {
-             newDayMark++;
+         if (newDayMark !== room.gameState.dayMark && newDayMark <= 7) {
              updates.dayMark = newDayMark;
              shouldUpdate = true;
          }
@@ -78,9 +77,10 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
              return;
          }
 
-         if (room.gameState.water > 0) {
-             updates.water = Math.max(0, room.gameState.water - 0.5);
-             updates.stamina = Math.max(0, room.gameState.stamina - 0.2);
+         // Passive drain
+         if (ticker % 2 === 0 && room.gameState.water > 0) {
+             updates.water = Math.max(0, room.gameState.water - 0.2);
+             updates.stamina = Math.max(0, room.gameState.stamina - 0.1);
              shouldUpdate = true;
          }
 
@@ -89,12 +89,22 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
          }
       }
       
+      // Auto transition Miracle -> Ambush after 8 seconds
+      if (room.status === GamePhase.MIRACLE) {
+          const startTime = room.gameState.phaseStartTime || Date.now();
+          const elapsed = Date.now() - startTime;
+          if (elapsed > 8000) {
+              gameService.setGamePhase(room.id, GamePhase.AMBUSH);
+          }
+      }
+
       // Handle Ambush Window timeout (10 seconds)
       if (room.status === GamePhase.AMBUSH) {
           const startTime = room.gameState.phaseStartTime || Date.now();
           const elapsed = Date.now() - startTime;
           if (elapsed > 10000) { // 10 seconds
-              const success = room.gameState.ambushTaps >= 100;
+              const requiredTaps = players.length > 0 ? players.length * 10 : 10;
+              const success = room.gameState.ambushTaps >= requiredTaps;
               gameService.updateGameState(room.id, { ambushSuccess: success });
               if (!success) {
                   // Take casualty damage
@@ -105,6 +115,16 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
               }
               // Move to moral crossroads
               gameService.setGamePhase(room.id, GamePhase.CROSSROADS);
+          }
+      }
+
+      // Handle Crossroads Auto Conclusion
+      if (room.status === GamePhase.CROSSROADS) {
+          const totalVotes = (room.gameState.votesEradicate || 0) + (room.gameState.votesWithdraw || 0);
+          if (totalVotes > 0 && totalVotes >= players.length) {
+              const endState = room.gameState.votesWithdraw >= room.gameState.votesEradicate ? EndState.TRUE : EndState.BAD;
+              gameService.updateGameState(room.id, { endState });
+              gameService.setGamePhase(room.id, GamePhase.END);
           }
       }
     }, 1000);
@@ -166,7 +186,7 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
 
   if (!room) return null;
 
-  const trekProgress = room.status === GamePhase.TREK ? Math.min(100, (ticker / 60) * 100) : (room.status === GamePhase.ALLIANCE ? 0 : 100);
+  const trekProgress = room.status === GamePhase.TREK ? Math.min(100, ((room.gameState.distance || 0) / 70) * 100) : (room.status === GamePhase.END || room.status === GamePhase.CROSSROADS || room.status === GamePhase.AMBUSH || room.status === GamePhase.MIRACLE || room.status === GamePhase.CRISIS ? 100 : 0);
 
   return (
     <motion.div 

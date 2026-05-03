@@ -255,44 +255,62 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
              animate={{ opacity: 1 }}
              className="flex flex-col gap-4 relative z-10"
            >
-              <div className="flex flex-col items-center justify-center p-8 bg-[var(--ink)] border border-[var(--gold)] text-center min-h-[30vh]">
-                  <Droplets className="w-16 h-16 text-blue-500 mb-6 opacity-50" />
-                  <h2 className="text-2xl font-bold uppercase text-[var(--gold)] tracking-tighter mb-4">March through Edom</h2>
+              {/* Trek Phase: Active Interaction */}
+              <div className="flex flex-col items-center justify-center p-8 bg-[var(--ink)] border border-[var(--gold)] text-center mb-4 min-h-[30vh]">
+                  <div className="flex w-full justify-between mb-4 opacity-70 text-[10px] uppercase font-mono text-[var(--gold)]">
+                      <span>Water: {Math.round(room.gameState.water)}%</span>
+                      <span>Stamina: {Math.round(room.gameState.stamina)}%</span>
+                  </div>
+                  
+                  <button 
+                      onClick={() => gameService.updateGameState(room.id, { 
+                          distance: Math.min(200, (room.gameState.distance || 0) + 1),
+                          water: Math.max(0, room.gameState.water - 0.2),
+                          stamina: Math.max(0, room.gameState.stamina - 0.1)
+                      })}
+                      className="w-32 h-32 rounded-full border-4 border-[var(--gold)] flex items-center justify-center mb-6 hover:bg-[var(--gold)]/10 active:bg-[var(--gold)]/30 active:scale-95 transition-all outline-none"
+                  >
+                      <span className="font-bold uppercase tracking-widest text-[var(--gold)] select-none pointer-events-none">March</span>
+                  </button>
                   <div className="text-[10px] font-mono text-[var(--sand)] uppercase tracking-widest opacity-60">
-                     Watch the Master Map. Monitor water reserves.
+                     Tap to advance through Edom.
                   </div>
               </div>
 
               {/* Faction specific actions */}
-              <div className="p-6 bg-[var(--ink)] border border-[var(--gold)]">
-                  <h3 className="text-[10px] uppercase tracking-widest text-[var(--gold)] mb-4">Faction Action</h3>
+              <div className="p-4 bg-[var(--ink)] border border-[var(--gold)]">
+                  <h3 className="text-[10px] uppercase tracking-widest text-[var(--gold)] mb-4 text-center">Faction Special Ability</h3>
                   {player.team === Team.YEHUDAH && (
                      <button 
-                        onClick={() => gameService.updateGameState(room.id, { allianceIntegrity: Math.min(100, room.gameState.allianceIntegrity + 10) })}
-                        className="w-full bg-red-800/20 border border-red-800 text-red-400 p-4 font-mono text-[10px] uppercase tracking-widest hover:bg-red-800/40"
+                        onClick={() => gameService.updateGameState(room.id, { 
+                           allianceIntegrity: Math.min(100, room.gameState.allianceIntegrity + 5),
+                           stamina: Math.max(0, room.gameState.stamina - 2)
+                        })}
+                        className="w-full bg-red-900/40 border border-red-500 text-red-200 p-4 font-mono text-xs uppercase tracking-widest active:bg-red-500/40"
                      >
-                        Use Prophetic Insight (Boost Integrity)
+                        Prophetic Insight <br/><span className="text-[8px] opacity-60">Consult Rashi & Boost Integrity (-Stamina)</span>
                      </button>
                   )}
                   {player.team === Team.YISRAEL && (
                      <button 
-                         onClick={() => {
-                             gameService.updateGameState(room.id, { 
-                                 stamina: Math.max(0, room.gameState.stamina - 5),
-                                 water: Math.max(0, room.gameState.water - 5)
-                             })
-                         }}
-                        className="w-full bg-blue-500/20 border border-blue-500 text-blue-400 p-4 font-mono text-[10px] uppercase tracking-widest hover:bg-blue-500/40"
+                         onClick={() => gameService.updateGameState(room.id, { 
+                           distance: Math.min(200, (room.gameState.distance || 0) + 3),
+                           water: Math.max(0, room.gameState.water - 1.5)
+                         })}
+                        className="w-full bg-blue-900/40 border border-blue-500 text-blue-200 p-4 font-mono text-xs uppercase tracking-widest active:bg-blue-500/40"
                      >
-                        Rapid Deployment (Sacrifice Resources for Speed)
+                        Rapid Deployment <br/><span className="text-[8px] opacity-60">3x Speed, Massive Water Drain</span>
                      </button>
                   )}
                   {player.team === Team.EDOM && (
                      <button 
-                         onClick={() => gameService.updateGameState(room.id, { water: Math.min(100, room.gameState.water + 10) })}
-                        className="w-full bg-stone-600/20 border border-stone-600 text-stone-400 p-4 font-mono text-[10px] uppercase tracking-widest hover:bg-stone-600/40"
+                         onClick={() => gameService.updateGameState(room.id, { 
+                            water: Math.min(100, room.gameState.water + 5),
+                            stamina: Math.max(0, room.gameState.stamina - 1)
+                         })}
+                        className="w-full bg-stone-800/60 border border-stone-500 text-stone-200 p-4 font-mono text-xs uppercase tracking-widest active:bg-stone-500/40"
                      >
-                        Scout Terrain (Locate Minor Water Source)
+                        Scout Terrain <br/><span className="text-[8px] opacity-60">Locate Water Source (-Stamina)</span>
                      </button>
                   )}
               </div>

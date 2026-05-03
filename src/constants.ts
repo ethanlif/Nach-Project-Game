@@ -19,10 +19,10 @@ export const STORY_BEATS = {
     crisis: "Seven days in the wilderness, and there is no water. The kings are stranded.",
     question: "Why does Elisha mock the King of Yisrael?",
     options: [
-      "Because the army is too small",
-      "Due to the king's idolatrous lineage (Achav and Izebel)",
-      "Because they marched without consulting a map",
-      "Because they forgot goatskins"
+      "Because he was a coward in battle.",
+      "He told him to consult the idolatrous prophets of his parents (Ahab and Jezebel) and asked 'What do I have to do with you?'.",
+      "Because he didn't bring enough water.",
+      "He forgot the traditional sacrifice."
     ],
     correctIndex: 1,
     learning: "Elisha only helps out of respect for King Yehoshaphat of Yehudah. He demands a musician, and prophecies that water will fill the valley without wind or rain."
