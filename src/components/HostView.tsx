@@ -396,13 +396,13 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
         </div>
 
         {/* Player List */}
-        <div className="bg-[var(--ink)] p-4 border border-[var(--gold)] h-48 overflow-y-auto relative z-10 shadow-xl">
+        <div className="bg-[var(--ink)] p-4 border border-[var(--gold)] h-64 overflow-y-auto relative z-10 shadow-xl scrollbar-thin scrollbar-thumb-[var(--gold)]/30 scrollbar-track-transparent">
              <div className="flex items-center justify-between mb-4 px-2">
                 <h3 className="text-[10px] uppercase tracking-tighter opacity-50 font-mono">Mobilized Units ({players.length})</h3>
                 <div className="flex gap-4">
                     {Object.values(Team).map(team => (
                         <div key={team} className="flex items-center gap-1">
-                            <div className={cn("w-2 h-2", 
+                            <div className={cn("w-2 h-2 rounded-full", 
                                 team === Team.YISRAEL ? "bg-blue-500" : 
                                 team === Team.YEHUDAH ? "bg-red-800" : "bg-black"
                             )} />
@@ -411,19 +411,19 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
                     ))}
                 </div>
              </div>
-             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
                 {players.map(player => (
-                    <div key={player.id} className="p-3 border border-[var(--gold)]/10 bg-[var(--gold)]/5 flex flex-col relative group transition-colors hover:border-[var(--gold)]/30">
-                        <span className="text-xs text-[var(--sand)] font-bold truncate uppercase">{player.name}</span>
-                        <div className="flex items-center justify-between mt-1">
-                            <span className="text-[8px] text-[var(--gold)] uppercase font-mono truncate">{player.team || 'Enlisting...'}</span>
-                            <span className="text-[8px] text-[var(--sand)]/40 font-mono text-right truncate pl-2">{player.strategy !== 'UNASSIGNED' ? player.strategy : ''}</span>
+                    <div key={player.id} className="p-2 border border-[var(--gold)]/10 bg-[var(--gold)]/5 flex flex-col relative group transition-all hover:border-[var(--gold)]/50 hover:bg-[var(--gold)]/10">
+                        <span className="text-[9px] text-[var(--sand)] font-bold truncate uppercase">{player.name}</span>
+                        <div className="flex items-center justify-between mt-0.5">
+                            <span className="text-[7px] text-[var(--gold)] uppercase font-mono truncate">{player.team ? (TEAM_NAMES[player.team]?.substring(0, 3)) : '...'}</span>
+                            <span className="text-[7px] text-[var(--sand)]/40 font-mono text-right truncate pl-1">{player.strategy !== 'UNASSIGNED' ? player.strategy.substring(0, 4) : ''}</span>
                         </div>
-                        <div className={cn("absolute bottom-0 left-0 h-0.5 bg-[var(--gold)]", 
+                        <div className={cn("absolute bottom-0 left-0 h-0.5 w-full", 
                             player.team === Team.YISRAEL ? "bg-blue-500" : 
                             player.team === Team.YEHUDAH ? "bg-red-800" : 
-                            player.team === Team.EDOM ? "bg-black" : "bg-transparent"
-                        )} style={{ width: '100%' }} />
+                            player.team === Team.EDOM ? "bg-stone-600" : "bg-transparent"
+                        )} />
                     </div>
                 ))}
              </div>

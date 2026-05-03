@@ -12,7 +12,8 @@ import {
   increment,
   arrayUnion,
   deleteDoc,
-  limit
+  limit,
+  writeBatch
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Room, GamePhase, GameState, Team, Player, AllianceStrategy, EndState } from '../types';
@@ -62,9 +63,7 @@ export const gameService = {
   },
 
   async joinRoom(code: string, playerName: string, userId: string): Promise<string | null> {
-    let roomId: string | null = null;
     try {
-      // Find room with specific code, limit 1 for speed
       const q = query(
         collection(db, ROOMS_COLLECTION), 
         where('code', '==', code), 
@@ -76,9 +75,11 @@ export const gameService = {
       if (querySnapshot.empty) return null;
       
       const roomDoc = querySnapshot.docs[0];
-      roomId = roomDoc.id;
+      const roomId = roomDoc.id;
       
       const playerRef = doc(db, `${ROOMS_COLLECTION}/${roomId}/players`, userId);
+      const roomRef = doc(db, ROOMS_COLLECTION, roomId);
+
       const playerData: Player = {
         id: userId,
         name: playerName,
@@ -88,31 +89,18 @@ export const gameService = {
         score: 0
       };
       
-      // Separate writes for clearer error attribution
-      try {
-        await setDoc(playerRef, playerData);
-      } catch (e) {
-        handleFirestoreError(e, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}/players/${userId}`);
-        throw e;
-      }
+      const batch = writeBatch(db);
+      batch.set(playerRef, playerData);
+      batch.update(roomRef, {
+        playersCount: increment(1),
+        lastAction: `Player ${playerName} Joined`
+      });
 
-      try {
-        await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
-          playersCount: increment(1),
-          lastAction: `Player ${playerName} Joined`
-        });
-      } catch (e) {
-        handleFirestoreError(e, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}`);
-        throw e;
-      }
-      
+      await batch.commit();
       return roomId;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('permission')) {
-          // Already handled by nested try/catch
-      } else {
-          console.error("JoinRoom Error:", error);
-      }
+      console.error("JoinRoom Error:", error);
+      handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${code}/players`);
       return null;
     }
   },
@@ -197,11 +185,15 @@ export const gameService = {
   async assignTeams(roomId: string, players: Player[]) {
     try {
       const teams: Team[] = [Team.YISRAEL, Team.YEHUDAH, Team.EDOM];
-      const updates = players.map((player, index) => {
+      const batch = writeBatch(db);
+      
+      players.forEach((player, index) => {
         const team = teams[index % teams.length];
-        return updateDoc(doc(db, `${ROOMS_COLLECTION}/${roomId}/players`, player.id), { team });
+        const playerRef = doc(db, `${ROOMS_COLLECTION}/${roomId}/players`, player.id);
+        batch.update(playerRef, { team });
       });
-      await Promise.all(updates);
+
+      await batch.commit();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}/players`);
     }

@@ -50,13 +50,13 @@ service cloud.firestore {
     // Rooms Collection
     match /rooms/{roomId} {
       allow get: if true; 
-      allow list: if isSignedIn(); // Allow searching by code
+      allow list: if isSignedIn();
       
       allow create: if isSignedIn() && isValidRoom(incoming()) && incoming().hostId == request.auth.uid;
       
       allow update: if isSignedIn() && (
         // Host Action: Manage phase/state
-        (existing().hostId == request.auth.uid && isValidRoom(incoming())) ||
+        (existing().hostId == request.auth.uid && (incoming().diff(existing()).affectedKeys().hasAny(['status', 'gameState', 'playersCount', 'lastAction']))) ||
         // Player Action: Join room (increment count and update lastAction)
         (incoming().diff(existing()).affectedKeys().hasOnly(['playersCount', 'lastAction']))
       );

@@ -10,20 +10,6 @@ export const googleProvider = new GoogleAuthProvider();
 
 export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
 
-// CRITICAL: Validate connection to Firestore
-async function testConnection() {
-  try {
-    // Try to get a non-existent doc to trigger a handshake
-    await getDocFromServer(doc(db, 'system', 'connection_test'));
-    console.log("Firebase connection established.");
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration or network.");
-    }
-  }
-}
-testConnection();
-
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
