@@ -11,7 +11,8 @@ import {
   serverTimestamp,
   increment,
   arrayUnion,
-  deleteDoc
+  deleteDoc,
+  limit
 } from 'firebase/firestore';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Room, GamePhase, GameState, Team, Player, AllianceStrategy, EndState } from '../types';
@@ -20,6 +21,7 @@ import { generateJoinCode } from '../lib/utils';
 const ROOMS_COLLECTION = 'rooms';
 
 export const gameService = {
+  // ... (createRoom stays the same) ...
   async createRoom(hostId: string): Promise<string> {
     const code = generateJoinCode();
     const roomId = doc(collection(db, ROOMS_COLLECTION)).id;
@@ -61,7 +63,13 @@ export const gameService = {
 
   async joinRoom(code: string, playerName: string, userId: string): Promise<string | null> {
     try {
-      const q = query(collection(db, ROOMS_COLLECTION), where('code', '==', code), where('status', '==', GamePhase.LOBBY));
+      // Find room with specific code, limit 1 for speed
+      const q = query(
+        collection(db, ROOMS_COLLECTION), 
+        where('code', '==', code), 
+        where('status', '==', GamePhase.LOBBY),
+        limit(1)
+      );
       const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) return null;
@@ -79,9 +87,11 @@ export const gameService = {
         score: 0
       };
       
+      // Batch-like behavior: create player and increment count
       await setDoc(playerRef, playerData);
       await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
-        playersCount: increment(1)
+        playersCount: increment(1),
+        lastAction: `Player ${playerName} Joined`
       });
       
       return roomId;
@@ -113,13 +123,14 @@ export const gameService = {
   async updateGameState(roomId: string, updates: Partial<GameState>) {
     try {
       const roomRef = doc(db, ROOMS_COLLECTION, roomId);
-      const roomSnap = await getDoc(roomRef);
-      if (roomSnap.exists()) {
-        const currentGameState = roomSnap.data().gameState;
-        await updateDoc(roomRef, {
-          gameState: { ...currentGameState, ...updates }
-        });
-      }
+      
+      // Convert nested updates to dot notation for atomic efficiency
+      const fieldUpdates: { [key: string]: any } = {};
+      Object.entries(updates).forEach(([key, value]) => {
+        fieldUpdates[`gameState.${key}`] = value;
+      });
+
+      await updateDoc(roomRef, fieldUpdates);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}`);
     }
