@@ -59,17 +59,66 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
     const interval = setInterval(() => {
       setTicker(t => t + 1);
       
-      // Automatic resource drain during Trek
-      if (room.status === GamePhase.TREK && room.gameState.water > 0) {
-        gameService.updateGameState(room.id, { 
-          water: Math.max(0, room.gameState.water - 0.5),
-          stamina: Math.max(0, room.gameState.stamina - 0.2) 
-        });
+      // Automatic resource drain and day progression during Trek
+      if (room.status === GamePhase.TREK) {
+         let newDayMark = room.gameState.dayMark || 0;
+         let shouldUpdate = false;
+         let updates: Partial<GameState> = {};
+
+         // Every 4 ticks, increase the day mark (makes the 7 day period take 28 seconds)
+         if (ticker > 0 && ticker % 4 === 0 && newDayMark < 7) {
+             newDayMark++;
+             updates.dayMark = newDayMark;
+             shouldUpdate = true;
+         }
+
+         if (newDayMark >= 7) {
+             // Hard Lock
+             gameService.setGamePhase(room.id, GamePhase.CRISIS);
+             return;
+         }
+
+         if (room.gameState.water > 0) {
+             updates.water = Math.max(0, room.gameState.water - 0.5);
+             updates.stamina = Math.max(0, room.gameState.stamina - 0.2);
+             shouldUpdate = true;
+         }
+
+         if (shouldUpdate) {
+             gameService.updateGameState(room.id, updates);
+         }
+      }
+      
+      // Handle Ambush Window timeout (10 seconds)
+      if (room.status === GamePhase.AMBUSH) {
+          const startTime = room.gameState.phaseStartTime || Date.now();
+          const elapsed = Date.now() - startTime;
+          if (elapsed > 10000) { // 10 seconds
+              const success = room.gameState.ambushTaps >= 100;
+              gameService.updateGameState(room.id, { ambushSuccess: success });
+              if (!success) {
+                  // Take casualty damage
+                  gameService.updateGameState(room.id, { 
+                      stamina: Math.max(0, room.gameState.stamina - 30),
+                      allianceIntegrity: Math.max(0, room.gameState.allianceIntegrity - 20)
+                  });
+              }
+              // Move to moral crossroads
+              gameService.setGamePhase(room.id, GamePhase.CROSSROADS);
+          }
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [room]);
+  }, [room, ticker]);
+
+  // Endings monitor
+  useEffect(() => {
+     if (room && room.gameState.stamina <= 0 && room.status !== GamePhase.END && room.status !== GamePhase.LOBBY) {
+         gameService.updateGameState(room.id, { endState: EndState.DESOLATION });
+         gameService.setGamePhase(room.id, GamePhase.END);
+     }
+  }, [room?.gameState.stamina, room?.status, room?.id]);
 
   const handleStartGame = async () => {
     if (roomId && players.length >= 1) {
@@ -203,13 +252,31 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
             <StatBar label="Stamina" value={room.gameState.stamina} color="bg-[var(--gold)]" icon={MapIcon} />
             <StatBar label="Water Supply" value={room.gameState.water} color="bg-blue-500" icon={Droplets} />
             <StatBar label="Alliance Integrity" value={room.gameState.allianceIntegrity} color="bg-green-600" icon={Shield} />
+            
+            <div className="pt-4 border-t border-[var(--gold)]/20">
+                <div className="flex justify-between items-center text-[10px] font-mono text-[var(--gold)] uppercase tracking-widest">
+                    <span>Expedition Day</span>
+                    <span>{room.gameState.dayMark || 0} / 7</span>
+                </div>
+            </div>
           </div>
         </div>
 
         {/* Game Master Overrides */}
         <div className="bg-[var(--ink)] text-[var(--sand)] p-6 border border-red-500/50 shadow-xl relative z-10">
           <h3 className="text-[10px] uppercase tracking-widest font-mono text-red-500 mb-4 flex items-center gap-2"><AlertTriangle className="w-3 h-3"/> Overrides</h3>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-2 mb-4">
+               <button 
+                  onClick={() => {
+                      gameService.updateGameState(room.id, { crisisResolved: true, water: 100 });
+                      gameService.setGamePhase(room.id, GamePhase.MIRACLE);
+                  }}
+                  className="text-[8px] font-mono border border-blue-500 p-2 hover:bg-blue-900/30 text-blue-400 uppercase tracking-widest"
+                >
+                 Push "Prophetic Guidance" (Solve Wadi Paradox)
+               </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-red-500/20">
             {[GamePhase.TREK, GamePhase.CRISIS, GamePhase.MIRACLE, GamePhase.AMBUSH, GamePhase.CROSSROADS, GamePhase.END].map((p) => (
                <button 
                   key={p}  
@@ -387,7 +454,7 @@ export const HostView: React.FC<HostViewProps> = ({ userId, onChangePhase, onBac
                             <p className="text-xl text-[var(--sand)]/80 max-w-2xl border-t border-[var(--gold)]/20 pt-6">
                               {room.gameState.endState === EndState.TRUE ? "You recognized the horror of the scene and chose to cease fire, showing proper humility and restraint. The lesson of trust over arrogance is fulfilled." : 
                                room.gameState.endState === EndState.BAD ? "The armies pressed the advantage, ignoring the human cost. The narrative ticker details the total loss of the kings' humanity, descending into the savage ways of those they fought." : 
-                               "They relied on their own swords and found only the dust of the wilderness. The miracle was never reached."}
+                               (room.gameState.crisisResolved ? "The armies were destroyed in combat. They faltered in their unity and were overrun." : "They relied on their own swords and found only the dust of the wilderness. The miracle was never reached.")}
                             </p>
                          </div>
                     )}

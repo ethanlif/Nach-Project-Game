@@ -31,6 +31,7 @@ export const gameService = {
       stamina: 100,
       water: 100,
       allianceIntegrity: 100,
+      dayMark: 0,
       currentPhase: GamePhase.LOBBY,
       phaseStartTime: Date.now(),
       strategiesLocked: {},

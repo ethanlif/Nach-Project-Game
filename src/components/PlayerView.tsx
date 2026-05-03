@@ -205,22 +205,40 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
 
                 <h3 className="text-xs uppercase tracking-tighter mb-4 text-[var(--sand)]">Lock In Operational Strategy</h3>
                 <div className="grid grid-cols-1 gap-3">
-                    {[AllianceStrategy.CAUTIOUS, AllianceStrategy.AGGRESSIVE, AllianceStrategy.SCOUT].map(strategy => (
+                    {player.team && (
                         <button
-                            key={strategy}
-                            onClick={() => handleStrategySelect(strategy)}
+                            onClick={() => handleStrategySelect(
+                                player.team === Team.YEHUDAH ? AllianceStrategy.CAUTIOUS :
+                                player.team === Team.YISRAEL ? AllianceStrategy.AGGRESSIVE :
+                                AllianceStrategy.SCOUT
+                            )}
                             className={cn(
                                 "p-4 text-left border transition-all",
-                                selectedStrategy === strategy 
+                                selectedStrategy !== AllianceStrategy.UNASSIGNED 
                                     ? "bg-[var(--gold)] border-[var(--gold)] text-[var(--ink)]" 
-                                    : "bg-transparent border-[var(--gold)]/30 text-[var(--sand)] hover:bg-[var(--gold)]/5"
+                                    : "bg-[var(--gold)]/20 border-[var(--gold)] text-[var(--gold)] hover:bg-[var(--gold)]/30"
                             )}
                         >
-                            <div className="font-bold uppercase text-sm mb-1">{STRATEGY_DESCRIPTIONS[strategy].name}</div>
-                            <div className="text-[10px] opacity-70 leading-tight mb-2">{STRATEGY_DESCRIPTIONS[strategy].desc}</div>
-                            <div className="text-[8px] font-mono text-[var(--gold)] uppercase bg-black/50 p-1 pl-2 border-l border-[var(--gold)] mix-blend-difference">{STRATEGY_DESCRIPTIONS[strategy].ability}</div>
+                            {(() => {
+                                const strategy = player.team === Team.YEHUDAH ? AllianceStrategy.CAUTIOUS :
+                                                 player.team === Team.YISRAEL ? AllianceStrategy.AGGRESSIVE :
+                                                 AllianceStrategy.SCOUT;
+                                return (
+                                    <>
+                                        <div className="font-bold uppercase text-sm mb-1">{STRATEGY_DESCRIPTIONS[strategy].name}</div>
+                                        <div className="text-[10px] opacity-70 leading-tight mb-2">{STRATEGY_DESCRIPTIONS[strategy].desc}</div>
+                                        <div className="text-[8px] font-mono text-[var(--gold)] uppercase bg-black/50 p-1 pl-2 border-l border-[var(--gold)] mix-blend-difference">{STRATEGY_DESCRIPTIONS[strategy].ability}</div>
+                                        {selectedStrategy === AllianceStrategy.UNASSIGNED && (
+                                            <div className="mt-4 text-center font-bold tracking-widest text-[10px] animate-pulse">TAP TO LOCK IN</div>
+                                        )}
+                                        {selectedStrategy !== AllianceStrategy.UNASSIGNED && (
+                                            <div className="mt-4 text-center font-bold tracking-widest text-[10px] text-[var(--ink)]">LOCKED</div>
+                                        )}
+                                    </>
+                                );
+                            })()}
                         </button>
-                    ))}
+                    )}
                 </div>
             </div>
             
@@ -235,12 +253,48 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
              key="trek"
              initial={{ opacity: 0 }}
              animate={{ opacity: 1 }}
-             className="flex flex-col items-center justify-center p-8 bg-[var(--ink)] border border-[var(--gold)] text-center min-h-[50vh]"
+             className="flex flex-col gap-4 relative z-10"
            >
-              <Droplets className="w-16 h-16 text-blue-500 mb-6 opacity-50" />
-              <h2 className="text-2xl font-bold uppercase text-[var(--gold)] tracking-tighter mb-4">March through Edom</h2>
-              <div className="text-[10px] font-mono text-[var(--sand)] uppercase tracking-widest opacity-60">
-                 Watch the Master Map. Monitor water reserves.
+              <div className="flex flex-col items-center justify-center p-8 bg-[var(--ink)] border border-[var(--gold)] text-center min-h-[30vh]">
+                  <Droplets className="w-16 h-16 text-blue-500 mb-6 opacity-50" />
+                  <h2 className="text-2xl font-bold uppercase text-[var(--gold)] tracking-tighter mb-4">March through Edom</h2>
+                  <div className="text-[10px] font-mono text-[var(--sand)] uppercase tracking-widest opacity-60">
+                     Watch the Master Map. Monitor water reserves.
+                  </div>
+              </div>
+
+              {/* Faction specific actions */}
+              <div className="p-6 bg-[var(--ink)] border border-[var(--gold)]">
+                  <h3 className="text-[10px] uppercase tracking-widest text-[var(--gold)] mb-4">Faction Action</h3>
+                  {player.team === Team.YEHUDAH && (
+                     <button 
+                        onClick={() => gameService.updateGameState(room.id, { allianceIntegrity: Math.min(100, room.gameState.allianceIntegrity + 10) })}
+                        className="w-full bg-red-800/20 border border-red-800 text-red-400 p-4 font-mono text-[10px] uppercase tracking-widest hover:bg-red-800/40"
+                     >
+                        Use Prophetic Insight (Boost Integrity)
+                     </button>
+                  )}
+                  {player.team === Team.YISRAEL && (
+                     <button 
+                         onClick={() => {
+                             gameService.updateGameState(room.id, { 
+                                 stamina: Math.max(0, room.gameState.stamina - 5),
+                                 water: Math.max(0, room.gameState.water - 5)
+                             })
+                         }}
+                        className="w-full bg-blue-500/20 border border-blue-500 text-blue-400 p-4 font-mono text-[10px] uppercase tracking-widest hover:bg-blue-500/40"
+                     >
+                        Rapid Deployment (Sacrifice Resources for Speed)
+                     </button>
+                  )}
+                  {player.team === Team.EDOM && (
+                     <button 
+                         onClick={() => gameService.updateGameState(room.id, { water: Math.min(100, room.gameState.water + 10) })}
+                        className="w-full bg-stone-600/20 border border-stone-600 text-stone-400 p-4 font-mono text-[10px] uppercase tracking-widest hover:bg-stone-600/40"
+                     >
+                        Scout Terrain (Locate Minor Water Source)
+                     </button>
+                  )}
               </div>
            </motion.div>
         )}
@@ -268,6 +322,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({ userId, onChangePhase, o
                                     onClick={() => {
                                       if (i === STORY_BEATS.CRISIS.correctIndex) {
                                         gameService.updateGameState(room.id, { crisisResolved: true, water: 100 });
+                                        gameService.setGamePhase(room.id, GamePhase.MIRACLE);
                                       } else {
                                         gameService.updateGameState(room.id, { stamina: Math.max(0, room.gameState.stamina - 10) });
                                       }

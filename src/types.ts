@@ -47,6 +47,7 @@ export interface GameState {
   stamina: number;           // 0-100
   water: number;             // 0-100
   allianceIntegrity: number; // 0-100 Shared meter
+  dayMark: number;           // Track days in the desert
   currentPhase: GamePhase;
   phaseStartTime: number | null;
   
