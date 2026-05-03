@@ -62,6 +62,7 @@ export const gameService = {
   },
 
   async joinRoom(code: string, playerName: string, userId: string): Promise<string | null> {
+    let roomId: string | null = null;
     try {
       // Find room with specific code, limit 1 for speed
       const q = query(
@@ -75,7 +76,7 @@ export const gameService = {
       if (querySnapshot.empty) return null;
       
       const roomDoc = querySnapshot.docs[0];
-      const roomId = roomDoc.id;
+      roomId = roomDoc.id;
       
       const playerRef = doc(db, `${ROOMS_COLLECTION}/${roomId}/players`, userId);
       const playerData: Player = {
@@ -87,16 +88,31 @@ export const gameService = {
         score: 0
       };
       
-      // Batch-like behavior: create player and increment count
-      await setDoc(playerRef, playerData);
-      await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
-        playersCount: increment(1),
-        lastAction: `Player ${playerName} Joined`
-      });
+      // Separate writes for clearer error attribution
+      try {
+        await setDoc(playerRef, playerData);
+      } catch (e) {
+        handleFirestoreError(e, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}/players/${userId}`);
+        throw e;
+      }
+
+      try {
+        await updateDoc(doc(db, ROOMS_COLLECTION, roomId), {
+          playersCount: increment(1),
+          lastAction: `Player ${playerName} Joined`
+        });
+      } catch (e) {
+        handleFirestoreError(e, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}`);
+        throw e;
+      }
       
       return roomId;
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `rooms/${code}/players`);
+      if (error instanceof Error && error.message.includes('permission')) {
+          // Already handled by nested try/catch
+      } else {
+          console.error("JoinRoom Error:", error);
+      }
       return null;
     }
   },
@@ -179,12 +195,16 @@ export const gameService = {
   },
 
   async assignTeams(roomId: string, players: Player[]) {
-    const teams: Team[] = [Team.YISRAEL, Team.YEHUDAH, Team.EDOM];
-    const updates = players.map((player, index) => {
-      const team = teams[index % teams.length];
-      return updateDoc(doc(db, `${ROOMS_COLLECTION}/${roomId}/players`, player.id), { team });
-    });
-    await Promise.all(updates);
+    try {
+      const teams: Team[] = [Team.YISRAEL, Team.YEHUDAH, Team.EDOM];
+      const updates = players.map((player, index) => {
+        const team = teams[index % teams.length];
+        return updateDoc(doc(db, `${ROOMS_COLLECTION}/${roomId}/players`, player.id), { team });
+      });
+      await Promise.all(updates);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `${ROOMS_COLLECTION}/${roomId}/players`);
+    }
   },
 
   async setPlayerStrategy(roomId: string, playerId: string, strategy: AllianceStrategy) {

@@ -43,21 +43,22 @@ service cloud.firestore {
              data.name is string && data.name.size() <= 32 &&
              data.isHost is bool &&
              data.score is number &&
-             data.strategy in ['CAUTIOUS', 'AGGRESSIVE', 'SCOUT', 'UNASSIGNED'];
+             data.strategy in ['CAUTIOUS', 'AGGRESSIVE', 'SCOUT', 'UNASSIGNED'] &&
+             (data.team == null || data.team in ['YISRAEL', 'YEHUDAH', 'EDOM']);
     }
 
     // Rooms Collection
     match /rooms/{roomId} {
-      allow get: if true; // Public access for join
-      allow list: if false; 
+      allow get: if true; 
+      allow list: if isSignedIn(); // Allow searching by code
       
       allow create: if isSignedIn() && isValidRoom(incoming()) && incoming().hostId == request.auth.uid;
       
       allow update: if isSignedIn() && (
         // Host Action: Manage phase/state
         (existing().hostId == request.auth.uid && isValidRoom(incoming())) ||
-        // Player Action: Just increment player count (atomic increment handled by server-side usually, but here we check)
-        (incoming().diff(existing()).affectedKeys().hasOnly(['playersCount']))
+        // Player Action: Join room (increment count and update lastAction)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['playersCount', 'lastAction']))
       );
     }
 
